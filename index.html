@@ -24,6 +24,8 @@
     button.primary{background:var(--accent);color:#052e16}
     button.danger{background:var(--danger)}
     button.ghost{background:transparent;border-color:var(--border)}
+    button.warn { background: #f59e0b; color: #2a1700; }
+
 
     .queue{display:flex;gap:10px;align-items:flex-end;min-height:96px;padding:12px;border:1px dashed var(--border);border-radius:16px;background:linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))}
     .box{position:relative;min-width:92px;max-width:140px;flex:0 0 auto;padding:10px 12px;border:1px solid var(--border);background:#0b1220;border-radius:14px;text-align:center;transition:transform .28s ease, opacity .28s ease}
@@ -49,7 +51,7 @@
         <input id="itemInput" placeholder="ContentType pContent" aria-label="Parameter für enqueue" />
         <button class="primary" id="addBtn">enqueue</button>
         <button class="danger" id="deqBtn">dequeue</button>
-        <button id="frontBtn" class="ghost">front</button>
+        <button id="frontBtn" class="warn">front</button>
         <button id="emptyBtn" class="ghost">isEmpty</button>
       </div>
 
@@ -74,23 +76,24 @@
     }
 
     function render(){
-      const q=$('#queue');
-      q.innerHTML='';
-      if(state.arr.length===0){
-        q.innerHTML='<span class="small">Kein Patient in der Warteschlange</span>';
+      const q = $('#queue');
+      q.innerHTML = '';
+      if (state.arr.length === 0) {
+        q.innerHTML = '<span class="small">Kein Patient in der Warteschlange</span>';
       } else {
-        state.arr.forEach((val,i)=>{
-          const div=document.createElement('div');
-          div.className='box';
-          div.innerHTML=`<div class="badge">${i===0?'H':'#'+(i+1)}</div>${val}`;
+        state.arr.forEach((val) => {
+          const div = document.createElement('div');
+          div.className = 'box';
+          div.textContent = val; // ✅ nur den Namen anzeigen, keine Nummern
           q.appendChild(div);
         });
-        const marker=document.createElement('span');
-        marker.className='marker';
-        marker.textContent='[T]';
+        const marker = document.createElement('span');
+        marker.className = 'marker';
+        marker.textContent = '[T]';
         q.appendChild(marker);
       }
     }
+
 
     function randomPatient(){
       const first=firstNames[Math.floor(Math.random()*firstNames.length)];
@@ -99,17 +102,15 @@
     }
 
     function enqueue(val){
-      const v=(val && val.trim());
-      if(!v){
-        // log('ERROR: Kein Parameter angegeben (enqueue abgebrochen)');
-        // console.error('enqueue(): Kein Parameter angegeben – kein Einfügen in die Queue.');
-        return;
-      }
+      const v = (val && val.trim());
+      if(!v){ return; }
       state.arr.push(v);
-      log(`enqueue( ${v} )`);
+      log(`enqueue( "${v}" )`);
       render();
       animateNew();
+      $('#itemInput').value = ""; // Eingabefeld leeren ✅
     }
+
 
     function dequeue(){
       if(state.arr.length===0){
