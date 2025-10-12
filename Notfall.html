@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Queue – Notfall in der Arztpraxis (Code + Hilfe)</title>
+  <style>
+    :root {
+      --bg:#0b1020; --card:#0f172a; --soft:#111827;
+      --text:#e5e7eb; --muted:#94a3b8; --border:#273244;
+      --accent:#22c55e; --danger:#ef4444; --warn:#f59e0b;
+      --hint:#93c5fd; --code:#a5f3fc; --cta:#ef4444;
+    }
+    body{margin:0;font-family:system-ui,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;background:var(--bg);color:var(--text);}
+    .wrap{max-width:1000px;margin:24px auto;padding:0 16px;}
+    h1{text-align:center;font-size:28px;margin:0 0 6px;}
+    .sub{text-align:center;color:#94a3b8;margin:0 0 16px;}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:0 8px 22px rgba(0,0,0,.35)}
+
+    .topbar{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+    .leftgroup{display:flex;gap:8px;align-items:center;flex:0 1 auto;flex-wrap:wrap}
+    label{color:#cbd5e1;font-size:14px}
+    input,button{border-radius:10px;border:1px solid var(--border);background:var(--soft);color:var(--text)}
+    input{padding:8px 10px;width:220px}
+    button{padding:8px 12px;cursor:pointer}
+    button.primary{background:var(--accent);color:#052e16}
+    button.danger{background:var(--danger)}
+    button.warn{background:var(--warn);color:#2a1700}
+    button.ghost{background:transparent}
+
+    .queues{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .lane{padding:10px;border:1px dashed var(--border);border-radius:12px}
+    h3{margin:0 0 6px;font-size:18px;color:#cbd5e1}
+    .queue{display:flex;gap:10px;flex-wrap:wrap;min-height:80px;margin-top:6px}
+    .box{padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:#0b1220;min-width:90px;text-align:center}
+    .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center}
+
+    .codeTitle{margin:14px 0 6px;font-size:16px;color:#cbd5e1}
+    .code{background:#0b1220;border:1px solid var(--border);border-radius:10px;padding:8px;font-family:ui-monospace,monospace;font-size:13px;color:var(--code);white-space:pre-wrap;min-height:100px}
+    .placeholder-comment{color:var(--cta);font-weight:600}
+    .helpTitle{margin:14px 0 6px;font-size:16px;color:#cbd5e1}
+    .help{background:#0b1220;border:1px solid var(--border);border-radius:10px;padding:8px;font-family:ui-monospace,monospace;font-size:12px;color:var(--hint);white-space:pre-wrap;min-height:80px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Queue – Notfall in der Arztpraxis</h1>
+    <p class="sub">
+      Jede Aktion erzeugt echten Java-Code (unten) und gibt bei Bedarf Hilfen (ganz unten).<br>
+      Ziel: Den Notfall mit <code>enqueue</code>, <code>dequeue</code>, <code>front</code>, <code>isEmpty</code> an die erste Position der <strong>ArztpraxisQueue</strong> bringen – mit Hilfe der <strong>HilfsQueue</strong>.
+    </p>
+
+    <div class="card">
+      <!-- Eingabe links, Reset rechts -->
+      <div class="topbar">
+        <div class="leftgroup">
+          <label for="nameInput">Eingabefeld:</label>
+          <input id="nameInput" value="Ernst Haft" />
+          <button id="toBuffer" class="warn">Name in Speicher</button>
+        </div>
+        <button id="resetAll" class="danger">Alles zurücksetzen</button>
+      </div>
+
+      <div class="queues">
+        <div class="lane">
+          <h3>ArztpraxisQueue</h3>
+          <div class="queue" id="qA"></div>
+          <div class="row">
+            <button class="primary" id="a_enqueue">enqueue</button>
+            <button class="danger"  id="a_dequeue">dequeue</button>
+            <button class="warn"    id="a_front">front</button>
+            <button class="ghost"   id="a_isEmpty">isEmpty</button>
+          </div>
+        </div>
+
+        <div class="lane">
+          <h3>HilfsQueue</h3>
+          <div class="queue" id="qH"></div>
+          <div class="row">
+            <button class="primary" id="h_enqueue">enqueue</button>
+            <button class="danger"  id="h_dequeue">dequeue</button>
+            <button class="warn"    id="h_front">front</button>
+            <button class="ghost"   id="h_isEmpty">isEmpty</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Java Code -->
+      <div class="codeTitle">Java Code:</div>
+      <div class="code" id="codeBox">// Java-Code-Generator
+// Starte mit Methodenaufrufen …</div>
+      <div class="row">
+        <button id="copyCode" class="primary">Java Code kopieren</button>
+      </div>
+
+      <!-- Hilfe-Konsole -->
+      <div class="helpTitle">Hinweise und Tipps:</div>
+      <div class="help" id="helpBox">// Hilfe-Konsole: Hier erscheinen Tipps und Fehlermeldungen.</div>
+    </div>
+  </div>
+
+  <script>
+    const firstNames=["Anna","Ben","Clara","David","Emma","Felix"];
+    const lastNames=["Müller","Schmidt","Schneider","Fischer","Weber","Wagner"];
+
+    const state = {
+      A: [], H: [],
+      code: [], codeHtml: [],
+      lastFrontFrom: null,          // "ArztpraxisQueue" | "HilfsQueue" | null
+      frontStillValid: false,       // wird false nach dequeue() auf derselben Quelle
+      pendingEnqueueTarget: null,   // "ArztpraxisQueue" | "HilfsQueue" (durch Klick auf enqueue gesetzt)
+      placeholderIndex: null        // Index der Platzhalter-Zeile im Code
+    };
+
+    const qA = document.getElementById('qA');
+    const qH = document.getElementById('qH');
+    const nameInput = document.getElementById('nameInput');
+    const codeBox = document.getElementById('codeBox');
+    const helpBox = document.getElementById('helpBox');
+
+    const setHelp = (msg)=> helpBox.textContent = msg || "// Hilfe-Konsole: Hier erscheinen Tipps und Fehlermeldungen.";
+    const rnd = a => a[Math.floor(Math.random()*a.length)];
+    const randomName = () => `${rnd(firstNames)} ${rnd(lastNames)}`;
+    const qName = t => t===state.A ? "ArztpraxisQueue" : "HilfsQueue";
+    const qOther = name => name==="ArztpraxisQueue" ? "HilfsQueue" : "ArztpraxisQueue";
+
+    function render(){
+      renderLane(qA, state.A);
+      renderLane(qH, state.H);
+      updateCodeBox();
+    }
+    function renderLane(container, arr){
+      container.innerHTML='';
+      if(arr.length===0){ container.textContent='[leer]'; return; }
+      arr.forEach(n=>{ const d=document.createElement('div'); d.className='box'; d.textContent=n; container.appendChild(d); });
+    }
+    function updateCodeBox(){
+      const html = state.codeHtml.length ? state.codeHtml.join("\n")
+        : "// Java-Code-Generator\n// Starte mit Methodenaufrufen …";
+      codeBox.innerHTML = html;
+    }
+    function addCode(line, htmlLine=null){
+      state.code.push(line);
+      state.codeHtml.push(htmlLine ?? escapeHtml(line));
+    }
+    function setCodeAt(index, line, htmlLine=null){
+      state.code[index] = line;
+      state.codeHtml[index] = htmlLine ?? escapeHtml(line);
+    }
+    function escapeHtml(s){ return s.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;"); }
+
+    function init(){
+      state.A = Array.from({length:3}, randomName);
+      state.H = [];
+      state.code = [];
+      state.codeHtml = [];
+      state.lastFrontFrom = null;
+      state.frontStillValid = false;
+      state.pendingEnqueueTarget = null;
+      state.placeholderIndex = null;
+      nameInput.value = "Ernst Haft";   // Reset: Textfeld wieder setzen
+      render();
+      setHelp("Flow: 1) Ziel mit enqueue wählen → 2) Quelle festlegen: entweder front() an der anderen Queue ODER Namen eingeben und „Name in Speicher“ drücken (wirkt nur nach enqueue).");
+    }
+
+    // --- Eingabename NUR über „Name in Speicher“ und NUR nach vorherigem enqueue ---
+    document.getElementById('toBuffer').onclick = ()=>{
+      const typed = (nameInput.value||"").trim();
+      if(!typed){
+        setHelp("Kein Name im Eingabefeld. Tippe einen Namen (z. B. „Rainer Zufall“) ein und drücke dann „Name in Speicher“.");
+        return;
+      }
+      if(!state.pendingEnqueueTarget){
+        setHelp("Drücke zuerst einen enqueue-Button (ArztpraxisQueue oder HilfsQueue), um das Ziel festzulegen. Danach „Name in Speicher“.");
+        return;
+      }
+      const targetName = state.pendingEnqueueTarget;
+      const targetArr = targetName==="ArztpraxisQueue" ? state.A : state.H;
+
+      targetArr.push(typed);
+      const line = `${targetName}.enqueue("${typed}");`;
+      if(state.placeholderIndex!=null){
+        setCodeAt(state.placeholderIndex, line);
+      } else {
+        addCode(line);
+      }
+
+      nameInput.value = "";
+      clearPending();
+      render();
+      setHelp(`Der eingegebene Name wurde in ${targetName} eingefügt. (Quelle: Eingabefeld)`);
+    };
+
+    function enqueue(target){
+      const targetName = qName(target);
+      // 1) Kombi: Wenn direkt davor ein gültiges front() aus der anderen Queue existiert → Kombi-Zeile
+      if(state.lastFrontFrom && state.frontStillValid && state.lastFrontFrom !== targetName){
+        const sourceName = state.lastFrontFrom;
+        const sourceArr = sourceName==="ArztpraxisQueue" ? state.A : state.H;
+        const val = sourceArr[0];
+        if(val==null){
+          setHelp(`${sourceName} ist leer – front() kann nichts liefern. Drücke stattdessen „Name in Speicher“ (nach enqueue) oder fülle um.`);
+          return;
+        }
+        target.push(val);
+        const line = `${targetName}.enqueue(${sourceName}.front());`;
+        addOrReplacePlaceholder(targetName, line);
+        clearPending();
+        render();
+        return;
+      }
+
+      // 2) Kein Name & kein gültiges front(): setze Placeholder + merke Ziel
+      state.pendingEnqueueTarget = targetName;
+      if(state.placeholderIndex==null){
+        const placeholderText = `${targetName}.enqueue(/* <span class="placeholder-comment">Was soll hinzugefügt werden?</span> */);`;
+        addCode(
+          `${targetName}.enqueue(/* Was soll hinzugefügt werden? */);`,
+          placeholderText
+        );
+        state.placeholderIndex = state.code.length-1;
+      }
+      updateCodeBox();
+      setHelp(`Du hast ${targetName}.enqueue() gewählt. Jetzt Quelle festlegen: 
+- Entweder ${qOther(targetName)}.front() drücken (Kombi-Zeile entsteht), 
+- oder oben einen Namen eingeben und „Name in Speicher“ drücken (wirkt nur nach enqueue).`);
+    }
+
+    function addOrReplacePlaceholder(targetName, line){
+      if(state.placeholderIndex!=null && state.pendingEnqueueTarget===targetName){
+        setCodeAt(state.placeholderIndex, line);
+      } else {
+        addCode(line);
+      }
+    }
+
+    function clearPending(){
+      state.pendingEnqueueTarget = null;
+      state.placeholderIndex = null;
+      state.lastFrontFrom = null;
+      state.frontStillValid = false;
+    }
+
+    function dequeue(target){
+      const name = qName(target);
+      if(target.length===0){
+        setHelp(`${name} ist leer. Prüfe vorher mit ${name}.isEmpty() oder füge nach enqueue einen Namen via „Name in Speicher“ hinzu.`);
+        return;
+      }
+      target.shift();
+      addCode(`${name}.dequeue();`);
+      if(state.lastFrontFrom === name){ state.frontStillValid = false; }
+      render();
+    }
+
+    function front(target){
+      const sourceName = qName(target);
+      if(target.length===0){
+        setHelp(`${sourceName} ist leer. Kein Wert für front(). Drücke stattdessen „Name in Speicher“ nach enqueue oder fülle erst um.`);
+        return;
+      }
+      const val = target[0];
+
+      // pending-Enqueue auf anderes Ziel → direkte Kombi + Einfügen
+      if(state.pendingEnqueueTarget && state.pendingEnqueueTarget !== sourceName){
+        const targetName = state.pendingEnqueueTarget;
+        const targetArr = targetName==="ArztpraxisQueue" ? state.A : state.H;
+        targetArr.push(val);
+        const line = `${targetName}.enqueue(${sourceName}.front());`;
+        if(state.placeholderIndex!=null){
+          setCodeAt(state.placeholderIndex, line);
+        } else {
+          addCode(line);
+        }
+        clearPending();
+        setHelp(`Quelle gelesen: ${sourceName}.front(). Die Kombi-Zeile wurde erzeugt/ersetzt und der Patient wurde eingefügt.`);
+        render();
+        return;
+      }
+
+      // sonst nur Status merken (kein eigener Codeeintrag → später Kombizeile)
+      state.lastFrontFrom = sourceName;
+      state.frontStillValid = true;
+      setHelp(`Gelesen: "${val}" aus ${sourceName}. Drücke jetzt ${qOther(sourceName)}.enqueue() für die Kombi-Zeile.`);
+    }
+
+    function isEmpty(target){
+      const name = qName(target);
+      const res = target.length===0;
+      addCode(`${name}.isEmpty();`);
+      if(res && name==="ArztpraxisQueue"){
+        setHelp("Die ArztpraxisQueue ist leer. Jetzt kannst du oben den Notfallnamen eingeben, dann ArztpraxisQueue.enqueue drücken und anschließend „Name in Speicher“.");
+      }
+      updateCodeBox();
+      return res;
+    }
+
+    // Buttons ArztpraxisQueue
+    document.getElementById('a_enqueue').onclick = ()=> enqueue(state.A);
+    document.getElementById('a_dequeue').onclick = ()=> dequeue(state.A);
+    document.getElementById('a_front').onclick   = ()=> front(state.A);
+    document.getElementById('a_isEmpty').onclick  = ()=> isEmpty(state.A);
+
+    // Buttons HilfsQueue
+    document.getElementById('h_enqueue').onclick = ()=> enqueue(state.H);
+    document.getElementById('h_dequeue').onclick = ()=> dequeue(state.H);
+    document.getElementById('h_front').onclick   = ()=> front(state.H);
+    document.getElementById('h_isEmpty').onclick  = ()=> isEmpty(state.H);
+
+    // Reset
+    document.getElementById('resetAll').onclick = init;
+
+    // Copy Java Code
+    document.getElementById('copyCode').onclick = async ()=>{
+      const plain = state.code.length ? state.code.join("\n")
+        : "// Java-Code-Generator\n// Starte mit Methodenaufrufen …";
+      try{
+        await navigator.clipboard.writeText(plain);
+        const btn = document.getElementById('copyCode');
+        const old = btn.textContent;
+        btn.textContent = "Kopiert!";
+        setTimeout(()=> btn.textContent = old, 1200);
+      }catch(e){
+        const range = document.createRange();
+        range.selectNodeContents(codeBox);
+        const sel = window.getSelection();
+        sel.removeAllRanges(); sel.addRange(range);
+        document.execCommand('copy');
+        sel.removeAllRanges();
+      }
+    };
+
+    // Start
+    init();
+  </script>
+</body>
+</html>
