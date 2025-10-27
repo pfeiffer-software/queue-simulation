@@ -17,8 +17,29 @@
     .sub{text-align:center;color:#94a3b8;margin:0 0 16px;}
     .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:0 8px 22px rgba(0,0,0,.35)}
 
-    .topbar{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
-    .leftgroup{display:flex;gap:8px;align-items:center;flex:0 1 auto;flex-wrap:wrap}
+    .topbar{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-bottom:10px
+    }
+    .leftgroup{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex:0 1 auto;
+      flex-wrap:wrap
+    }
+
+    .rightgroup{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+
     label{color:#cbd5e1;font-size:14px}
     input,button{border-radius:10px;border:1px solid var(--border);background:var(--soft);color:var(--text)}
     input{padding:8px 10px;width:220px}
@@ -27,19 +48,62 @@
     button.danger{background:var(--danger)}
     button.warn{background:var(--warn);color:#2a1700}
     button.ghost{background:transparent}
+    button.dim{opacity:.5;cursor:not-allowed}
 
     .queues{display:grid;grid-template-columns:1fr 1fr;gap:16px}
     .lane{padding:10px;border:1px dashed var(--border);border-radius:12px}
     h3{margin:0 0 6px;font-size:18px;color:#cbd5e1}
-    .queue{display:flex;gap:10px;flex-wrap:wrap;min-height:80px;margin-top:6px}
-    .box{padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:#0b1220;min-width:90px;text-align:center}
-    .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center}
+    .queue{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      min-height:80px;
+      margin-top:6px;
+      max-height:180px;             /* Scrollbereich falls zu viele Patienten */
+      overflow-y:auto;              /* <- Scrollbar */
+      padding-right:4px;
+    }
+    .box{
+      padding:10px 12px;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:#0b1220;
+      min-width:90px;
+      text-align:center
+    }
+    .row{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      margin-top:8px;
+      align-items:center
+    }
 
     .codeTitle{margin:14px 0 6px;font-size:16px;color:#cbd5e1}
-    .code{background:#0b1220;border:1px solid var(--border);border-radius:10px;padding:8px;font-family:ui-monospace,monospace;font-size:13px;color:var(--code);white-space:pre-wrap;min-height:100px}
+    .code{
+      background:#0b1220;
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:8px;
+      font-family:ui-monospace,monospace;
+      font-size:13px;
+      color:var(--code);
+      white-space:pre-wrap;
+      min-height:100px
+    }
     .placeholder-comment{color:var(--cta);font-weight:600}
     .helpTitle{margin:14px 0 6px;font-size:16px;color:#cbd5e1}
-    .help{background:#0b1220;border:1px solid var(--border);border-radius:10px;padding:8px;font-family:ui-monospace,monospace;font-size:12px;color:var(--hint);white-space:pre-wrap;min-height:80px}
+    .help{
+      background:#0b1220;
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:8px;
+      font-family:ui-monospace,monospace;
+      font-size:12px;
+      color:var(--hint);
+      white-space:pre-wrap;
+      min-height:80px
+    }
   </style>
 </head>
 <body>
@@ -51,14 +115,19 @@
     </p>
 
     <div class="card">
-      <!-- Eingabe links, Reset rechts -->
+      <!-- Eingabe links / rechts: Undo, Redo, Reset -->
       <div class="topbar">
         <div class="leftgroup">
           <label for="nameInput">Eingabefeld:</label>
           <input id="nameInput" value="Ernst Haft" />
           <button id="toBuffer" class="warn">Name in Speicher</button>
         </div>
-        <button id="resetAll" class="danger">Alles zurücksetzen</button>
+
+        <div class="rightgroup">
+          <button id="undoBtn" class="ghost" title="Rückgängig (Undo)">↺</button>
+          <button id="redoBtn" class="ghost" title="Wiederholen (Redo)">↻</button>
+          <button id="resetAll" class="danger">Alles zurücksetzen</button>
+        </div>
       </div>
 
       <div class="queues">
@@ -106,10 +175,14 @@
     const state = {
       A: [], H: [],
       code: [], codeHtml: [],
-      lastFrontFrom: null,          // "ArztpraxisQueue" | "HilfsQueue" | null
-      frontStillValid: false,       // wird false nach dequeue() auf derselben Quelle
-      pendingEnqueueTarget: null,   // "ArztpraxisQueue" | "HilfsQueue" (durch Klick auf enqueue gesetzt)
-      placeholderIndex: null        // Index der Platzhalter-Zeile im Code
+      lastFrontFrom: null,
+      frontStillValid: false,
+      pendingEnqueueTarget: null,
+      placeholderIndex: null,
+
+      // <<< UNDO/REDO Speicher >>>
+      history: [],
+      future: []
     };
 
     const qA = document.getElementById('qA');
@@ -117,12 +190,98 @@
     const nameInput = document.getElementById('nameInput');
     const codeBox = document.getElementById('codeBox');
     const helpBox = document.getElementById('helpBox');
+    const undoBtn = document.getElementById('undoBtn');
+    const redoBtn = document.getElementById('redoBtn');
 
     const setHelp = (msg)=> helpBox.textContent = msg || "// Hilfe-Konsole: Hier erscheinen Tipps und Fehlermeldungen.";
     const rnd = a => a[Math.floor(Math.random()*a.length)];
     const randomName = () => `${rnd(firstNames)} ${rnd(lastNames)}`;
     const qName = t => t===state.A ? "ArztpraxisQueue" : "HilfsQueue";
     const qOther = name => name==="ArztpraxisQueue" ? "HilfsQueue" : "ArztpraxisQueue";
+
+    // --------- UNDO / REDO LOGIK ---------
+    function cloneCurrentSnapshot(){
+      return {
+        A: [...state.A],
+        H: [...state.H],
+        code: [...state.code],
+        codeHtml: [...state.codeHtml],
+        lastFrontFrom: state.lastFrontFrom,
+        frontStillValid: state.frontStillValid,
+        pendingEnqueueTarget: state.pendingEnqueueTarget,
+        placeholderIndex: state.placeholderIndex,
+        nameInputValue: nameInput.value,
+        helpText: helpBox.textContent
+      };
+    }
+
+    function loadSnapshot(snap){
+      state.A = [...snap.A];
+      state.H = [...snap.H];
+      state.code = [...snap.code];
+      state.codeHtml = [...snap.codeHtml];
+      state.lastFrontFrom = snap.lastFrontFrom;
+      state.frontStillValid = snap.frontStillValid;
+      state.pendingEnqueueTarget = snap.pendingEnqueueTarget;
+      state.placeholderIndex = snap.placeholderIndex;
+      nameInput.value = snap.nameInputValue;
+      helpBox.textContent = snap.helpText;
+      render();
+    }
+
+    function pushHistory(){
+      // nach jeder Änderung rufen wir pushHistory() VOR der nächsten Änderung?
+      // -> wir machen es so: bevor wir ETWAS verändern, speichern wir aktuellen Zustand.
+      // dafür nutzen wir helper-Funktion changeWrapper(fn)
+    }
+
+    function updateUndoRedoButtons(){
+      // dim wenn nichts da
+      if(state.history.length===0){
+        undoBtn.classList.add('dim');
+      } else {
+        undoBtn.classList.remove('dim');
+      }
+      if(state.future.length===0){
+        redoBtn.classList.add('dim');
+      } else {
+        redoBtn.classList.remove('dim');
+      }
+    }
+
+    function changeWrapper(actionFn){
+      // vor Änderung: aktuellen Snapshot in history schieben, future leeren
+      state.history.push(cloneCurrentSnapshot());
+      state.future = [];
+      actionFn();
+      render();
+      updateUndoRedoButtons();
+    }
+
+    undoBtn.onclick = ()=>{
+      if(state.history.length===0) return;
+      // aktuellen Zustand in future legen
+      const current = cloneCurrentSnapshot();
+      state.future.push(current);
+
+      // letzten alten Zustand laden
+      const prev = state.history.pop();
+      loadSnapshot(prev);
+      updateUndoRedoButtons();
+    };
+
+    redoBtn.onclick = ()=>{
+      if(state.future.length===0) return;
+      // aktuellen Zustand in history legen
+      const current = cloneCurrentSnapshot();
+      state.history.push(current);
+
+      // nächsten Zustand laden
+      const next = state.future.pop();
+      loadSnapshot(next);
+      updateUndoRedoButtons();
+    };
+    // --------- ENDE UNDO / REDO ---------
 
     function render(){
       renderLane(qA, state.A);
@@ -132,7 +291,14 @@
     function renderLane(container, arr){
       container.innerHTML='';
       if(arr.length===0){ container.textContent='[leer]'; return; }
-      arr.forEach(n=>{ const d=document.createElement('div'); d.className='box'; d.textContent=n; container.appendChild(d); });
+      arr.forEach(n=>{
+        const d=document.createElement('div');
+        d.className='box';
+        d.textContent=n;
+        container.appendChild(d);
+      });
+      // immer nach unten scrollen, damit neueste unten sichtbar ist
+      container.scrollTop = container.scrollHeight;
     }
     function updateCodeBox(){
       const html = state.codeHtml.length ? state.codeHtml.join("\n")
@@ -147,9 +313,14 @@
       state.code[index] = line;
       state.codeHtml[index] = htmlLine ?? escapeHtml(line);
     }
-    function escapeHtml(s){ return s.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;"); }
+    function escapeHtml(s){
+      return s
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;");
+    }
 
-    function init(){
+    function hardResetToInitial(){
       state.A = Array.from({length:3}, randomName);
       state.H = [];
       state.code = [];
@@ -158,72 +329,83 @@
       state.frontStillValid = false;
       state.pendingEnqueueTarget = null;
       state.placeholderIndex = null;
-      nameInput.value = "Ernst Haft";   // Reset: Textfeld wieder setzen
-      render();
+      nameInput.value = "Ernst Haft";
       setHelp("Flow: 1) Ziel mit enqueue wählen → 2) Quelle festlegen: entweder front() an der anderen Queue ODER Namen eingeben und „Name in Speicher“ drücken (wirkt nur nach enqueue).");
+      render();
+      // Reset killt Verlauf komplett
+      state.history = [];
+      state.future  = [];
+      updateUndoRedoButtons();
+    }
+
+    function init(){
+      hardResetToInitial();
     }
 
     // --- Eingabename NUR über „Name in Speicher“ und NUR nach vorherigem enqueue ---
     document.getElementById('toBuffer').onclick = ()=>{
+      if(!state.pendingEnqueueTarget){
+        setHelp("Drücke zuerst einen enqueue-Button (ArztpraxisQueue oder HilfsQueue), um das Ziel festzulegen. Danach „Name in Speicher“.");
+        return;
+      }
       const typed = (nameInput.value||"").trim();
       if(!typed){
         setHelp("Kein Name im Eingabefeld. Tippe einen Namen (z. B. „Rainer Zufall“) ein und drücke dann „Name in Speicher“.");
         return;
       }
-      if(!state.pendingEnqueueTarget){
-        setHelp("Drücke zuerst einen enqueue-Button (ArztpraxisQueue oder HilfsQueue), um das Ziel festzulegen. Danach „Name in Speicher“.");
-        return;
-      }
-      const targetName = state.pendingEnqueueTarget;
-      const targetArr = targetName==="ArztpraxisQueue" ? state.A : state.H;
 
-      targetArr.push(typed);
-      const line = `${targetName}.enqueue("${typed}");`;
-      if(state.placeholderIndex!=null){
-        setCodeAt(state.placeholderIndex, line);
-      } else {
-        addCode(line);
-      }
+      changeWrapper(()=>{
+        const targetName = state.pendingEnqueueTarget;
+        const targetArr = targetName==="ArztpraxisQueue" ? state.A : state.H;
 
-      nameInput.value = "";
-      clearPending();
-      render();
-      setHelp(`Der eingegebene Name wurde in ${targetName} eingefügt. (Quelle: Eingabefeld)`);
+        targetArr.push(typed);
+        const line = `${targetName}.enqueue("${typed}");`;
+        if(state.placeholderIndex!=null){
+          setCodeAt(state.placeholderIndex, line);
+        } else {
+          addCode(line);
+        }
+
+        nameInput.value = "";
+        clearPending();
+        setHelp(`Der eingegebene Name wurde in ${targetName} eingefügt. (Quelle: Eingabefeld)`);
+      });
     };
 
     function enqueue(target){
-      const targetName = qName(target);
-      // 1) Kombi: Wenn direkt davor ein gültiges front() aus der anderen Queue existiert → Kombi-Zeile
-      if(state.lastFrontFrom && state.frontStillValid && state.lastFrontFrom !== targetName){
-        const sourceName = state.lastFrontFrom;
-        const sourceArr = sourceName==="ArztpraxisQueue" ? state.A : state.H;
-        const val = sourceArr[0];
-        if(val==null){
-          setHelp(`${sourceName} ist leer – front() kann nichts liefern. Drücke stattdessen „Name in Speicher“ (nach enqueue) oder fülle um.`);
+      changeWrapper(()=>{
+        const targetName = qName(target);
+        // 1) Kombi: Wenn direkt davor ein gültiges front() aus der anderen Queue existiert → Kombi-Zeile
+        if(state.lastFrontFrom && state.frontStillValid && state.lastFrontFrom !== targetName){
+          const sourceName = state.lastFrontFrom;
+          const sourceArr = sourceName==="ArztpraxisQueue" ? state.A : state.H;
+          const val = sourceArr[0];
+          if(val==null){
+            setHelp(`${sourceName} ist leer – front() kann nichts liefern. Drücke stattdessen „Name in Speicher“ (nach enqueue) oder fülle um.`);
+            return;
+          }
+          target.push(val);
+          const line = `${targetName}.enqueue(${sourceName}.front());`;
+          addOrReplacePlaceholder(targetName, line);
+          clearPending();
           return;
         }
-        target.push(val);
-        const line = `${targetName}.enqueue(${sourceName}.front());`;
-        addOrReplacePlaceholder(targetName, line);
-        clearPending();
-        render();
-        return;
-      }
 
-      // 2) Kein Name & kein gültiges front(): setze Placeholder + merke Ziel
-      state.pendingEnqueueTarget = targetName;
-      if(state.placeholderIndex==null){
-        const placeholderText = `${targetName}.enqueue(/* <span class="placeholder-comment">Was soll hinzugefügt werden?</span> */);`;
-        addCode(
-          `${targetName}.enqueue(/* Was soll hinzugefügt werden? */);`,
-          placeholderText
-        );
-        state.placeholderIndex = state.code.length-1;
-      }
-      updateCodeBox();
-      setHelp(`Du hast ${targetName}.enqueue() gewählt. Jetzt Quelle festlegen: 
+        // 2) Kein Name & kein gültiges front(): setze Placeholder + merke Ziel
+        state.pendingEnqueueTarget = targetName;
+        if(state.placeholderIndex==null){
+          const placeholderText = `${targetName}.enqueue(/* <span class="placeholder-comment">Was soll hinzugefügt werden?</span> */);`;
+          addCode(
+            `${targetName}.enqueue(/* Was soll hinzugefügt werden? */);`,
+            placeholderText
+          );
+          state.placeholderIndex = state.code.length-1;
+        }
+        updateCodeBox();
+        setHelp(`Du hast ${targetName}.enqueue() gewählt. Jetzt Quelle festlegen: 
 - Entweder ${qOther(targetName)}.front() drücken (Kombi-Zeile entsteht), 
 - oder oben einen Namen eingeben und „Name in Speicher“ drücken (wirkt nur nach enqueue).`);
+      });
     }
 
     function addOrReplacePlaceholder(targetName, line){
@@ -232,6 +414,7 @@
       } else {
         addCode(line);
       }
+      updateCodeBox();
     }
 
     function clearPending(){
@@ -242,57 +425,59 @@
     }
 
     function dequeue(target){
-      const name = qName(target);
-      if(target.length===0){
-        setHelp(`${name} ist leer. Prüfe vorher mit ${name}.isEmpty() oder füge nach enqueue einen Namen via „Name in Speicher“ hinzu.`);
-        return;
-      }
-      target.shift();
-      addCode(`${name}.dequeue();`);
-      if(state.lastFrontFrom === name){ state.frontStillValid = false; }
-      render();
+      changeWrapper(()=>{
+        const name = qName(target);
+        if(target.length===0){
+          setHelp(`${name} ist leer. Prüfe vorher mit ${name}.isEmpty() oder füge nach enqueue einen Namen via „Name in Speicher“ hinzu.`);
+          return;
+        }
+        target.shift();
+        addCode(`${name}.dequeue();`);
+        if(state.lastFrontFrom === name){ state.frontStillValid = false; }
+      });
     }
 
     function front(target){
-      const sourceName = qName(target);
-      if(target.length===0){
-        setHelp(`${sourceName} ist leer. Kein Wert für front(). Drücke stattdessen „Name in Speicher“ nach enqueue oder fülle erst um.`);
-        return;
-      }
-      const val = target[0];
-
-      // pending-Enqueue auf anderes Ziel → direkte Kombi + Einfügen
-      if(state.pendingEnqueueTarget && state.pendingEnqueueTarget !== sourceName){
-        const targetName = state.pendingEnqueueTarget;
-        const targetArr = targetName==="ArztpraxisQueue" ? state.A : state.H;
-        targetArr.push(val);
-        const line = `${targetName}.enqueue(${sourceName}.front());`;
-        if(state.placeholderIndex!=null){
-          setCodeAt(state.placeholderIndex, line);
-        } else {
-          addCode(line);
+      changeWrapper(()=>{
+        const sourceName = qName(target);
+        if(target.length===0){
+          setHelp(`${sourceName} ist leer. Kein Wert für front(). Drücke stattdessen „Name in Speicher“ nach enqueue oder fülle erst um.`);
+          return;
         }
-        clearPending();
-        setHelp(`Quelle gelesen: ${sourceName}.front(). Die Kombi-Zeile wurde erzeugt/ersetzt und der Patient wurde eingefügt.`);
-        render();
-        return;
-      }
+        const val = target[0];
 
-      // sonst nur Status merken (kein eigener Codeeintrag → später Kombizeile)
-      state.lastFrontFrom = sourceName;
-      state.frontStillValid = true;
-      setHelp(`Gelesen: "${val}" aus ${sourceName}. Drücke jetzt ${qOther(sourceName)}.enqueue() für die Kombi-Zeile.`);
+        // pending-Enqueue auf anderes Ziel → direkte Kombi + Einfügen
+        if(state.pendingEnqueueTarget && state.pendingEnqueueTarget !== sourceName){
+          const targetName = state.pendingEnqueueTarget;
+          const targetArr = targetName==="ArztpraxisQueue" ? state.A : state.H;
+          targetArr.push(val);
+          const line = `${targetName}.enqueue(${sourceName}.front());`;
+          if(state.placeholderIndex!=null){
+            setCodeAt(state.placeholderIndex, line);
+          } else {
+            addCode(line);
+          }
+          clearPending();
+          setHelp(`Quelle gelesen: ${sourceName}.front(). Die Kombi-Zeile wurde erzeugt/ersetzt und der Patient wurde eingefügt.`);
+          return;
+        }
+
+        // sonst nur Status merken (kein eigener Codeeintrag → später Kombizeile)
+        state.lastFrontFrom = sourceName;
+        state.frontStillValid = true;
+        setHelp(`Gelesen: "${val}" aus ${sourceName}. Drücke jetzt ${qOther(sourceName)}.enqueue() für die Kombi-Zeile.`);
+      });
     }
 
     function isEmpty(target){
-      const name = qName(target);
-      const res = target.length===0;
-      addCode(`${name}.isEmpty();`);
-      if(res && name==="ArztpraxisQueue"){
-        setHelp("Die ArztpraxisQueue ist leer. Jetzt kannst du oben den Notfallnamen eingeben, dann ArztpraxisQueue.enqueue drücken und anschließend „Name in Speicher“.");
-      }
-      updateCodeBox();
-      return res;
+      changeWrapper(()=>{
+        const name = qName(target);
+        const res = target.length===0;
+        addCode(`${name}.isEmpty();`);
+        if(res && name==="ArztpraxisQueue"){
+          setHelp("Die ArztpraxisQueue ist leer. Jetzt kannst du oben den Notfallnamen eingeben, dann ArztpraxisQueue.enqueue drücken und anschließend „Name in Speicher“.");
+        }
+      });
     }
 
     // Buttons ArztpraxisQueue
@@ -308,7 +493,7 @@
     document.getElementById('h_isEmpty').onclick  = ()=> isEmpty(state.H);
 
     // Reset
-    document.getElementById('resetAll').onclick = init;
+    document.getElementById('resetAll').onclick = hardResetToInitial;
 
     // Copy Java Code
     document.getElementById('copyCode').onclick = async ()=>{
