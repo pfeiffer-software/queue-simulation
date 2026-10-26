@@ -104,7 +104,52 @@
       white-space:pre-wrap;
       min-height:80px
     }
-  </style>
+  
+*{box-sizing:border-box}
+.wrap{max-width:1100px}
+.queues{grid-template-columns:minmax(0,1fr)}
+.lane{min-width:0}
+/* Eine zusammenhängende Kette darf nicht umbrechen: bei Bedarf seitlich scrollen. */
+.queue { display:block; width:100%; min-width:0; min-height:176px; max-height:none; padding:10px 12px;
+  overflow-x:auto; overflow-y:hidden; border:1px dashed var(--border); border-radius:12px;
+  background:#0b1220; scrollbar-color:#64748b #0b1220; }
+.linked-chain { display:flex; flex-wrap:nowrap; align-items:flex-start; width:max-content; min-width:100%; padding:0 4px 4px; }
+.node-wrapper { position:relative; flex:0 0 190px; width:190px; padding-top:44px; }
+.linked-node { display:flex; height:86px; background:#111c30; border:1px solid #5e718e; border-radius:10px; overflow:hidden; }
+.node-content { min-width:0; flex:1; display:flex; flex-direction:column; justify-content:center; gap:5px; padding:10px; }
+.node-key { color:#a8b8ce; font-size:10px; line-height:13px; font-family:ui-monospace,monospace; }
+.node-name { color:#f1f5f9; font-size:14px; line-height:17px; font-weight:600; overflow-wrap:anywhere;
+  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.node-next { position:relative; flex:0 0 63px; width:63px; border-left:1px solid #5e718e; color:#67e8f9; }
+.node-next .node-key { position:absolute; top:9px; left:0; width:100%; text-align:center; }
+.pointer-dot { position:absolute; left:50%; top:50%; width:7px; height:7px; border-radius:50%; background:#67e8f9; transform:translate(-50%,-50%); }
+.node-next::after { content:''; position:absolute; top:50%; left:50%; right:-1px; height:2px; background:#67e8f9; transform:translateY(-50%); }
+.next-link { flex:0 0 44px; width:44px; height:130px; padding-top:44px; display:flex; align-items:center; color:#67e8f9; }
+.successor-arrow { display:block; width:44px; height:20px; flex-shrink:0; }
+.node-reference { position:absolute; top:0; width:64px; height:44px; display:flex; flex-direction:column; align-items:center; font-size:12px; line-height:16px; font-weight:700; }
+.node-reference.head { left:10px; color:#93c5fd; }
+.node-reference.tail { right:8px; color:#fbbf24; }
+.reference-arrow { display:block; width:16px; height:26px; }
+.null-wrapper { flex:0 0 54px; padding-top:44px; height:130px; display:flex; align-items:center; }
+.null-value { color:#e2e8f0; font-size:14px; font-family:ui-monospace,monospace; padding:5px 7px; border:1px solid #64748b; border-radius:6px; background:#172033; }
+.empty-chain { min-height:140px; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:14px; }
+.empty-diagram { display:grid; grid-template-columns:44px 96px 48px; grid-template-rows:40px 40px; column-gap:6px; align-items:center; }
+.empty-reference { display:flex; align-items:center; font-size:13px; }
+.empty-reference.head { grid-column:1; grid-row:1; color:#93c5fd; }
+.empty-reference.tail { grid-column:1; grid-row:2; color:#fbbf24; }
+.empty-arrows { grid-column:2; grid-row:1 / 3; width:96px; height:80px; }
+.empty-head-path { color:#93c5fd; }
+.empty-tail-path { color:#fbbf24; }
+.empty-diagram > .null-value { grid-column:3; grid-row:1 / 3; justify-self:start; padding:0; border:0; background:transparent; font-size:16px; }
+.empty-label { margin:0; color:var(--muted); text-align:center; font-size:13px; }
+.structure-note { margin:10px 0 14px; color:#cbd5e1; font-size:13px; line-height:1.5; }
+.structure-note code { color:#a5f3fc; font-size:12px; }
+.linked-node.new { animation:node-appears .5s ease-out; }
+@keyframes node-appears { from { background:#164e3d; box-shadow:0 0 0 2px #22c55e; } to { background:#111c30; box-shadow:none; } }
+@media (prefers-reduced-motion:reduce) { .linked-node.new { animation:none; } }
+@media (max-width:600px) { .queue { padding:8px; } .structure-note { font-size:12px; } }
+
+</style>
 </head>
 <body>
   <div class="wrap">
@@ -130,10 +175,12 @@
         </div>
       </div>
 
+<p class="structure-note">Verkettete Implementierung: Jeder Knoten enthält einen Patientennamen und den Verweis <code>nextNode</code>. Die Pfeile zeigen gespeicherte Verweise, keine Bewegungsrichtung.</p>
+
       <div class="queues">
         <div class="lane">
           <h3>ArztpraxisQueue</h3>
-          <div class="queue" id="qA"></div>
+          <div class="queue" id="qA" tabindex="0" aria-label="Verkettete ArztpraxisQueue"></div>
           <div class="row">
             <button class="primary" id="a_enqueue">enqueue</button>
             <button class="danger"  id="a_dequeue">dequeue</button>
@@ -144,7 +191,7 @@
 
         <div class="lane">
           <h3>HilfsQueue</h3>
-          <div class="queue" id="qH"></div>
+          <div class="queue" id="qH" tabindex="0" aria-label="Verkettete HilfsQueue"></div>
           <div class="row">
             <button class="primary" id="h_enqueue">enqueue</button>
             <button class="danger"  id="h_dequeue">dequeue</button>
@@ -169,11 +216,176 @@
   </div>
 
   <script>
+// Die gleiche verkettete Struktur wie in Queue.java: head, tail, content, nextNode.
+let nextQueueNodeId = 1;
+class QueueNode {
+  constructor(content) {
+    this.id = 'knoten-' + nextQueueNodeId++;
+    this.content = content;
+    this.nextNode = null;
+  }
+}
+class LinkedQueue {
+  constructor(contents = []) {
+    this.head = null;
+    this.tail = null;
+    contents.forEach(content => this.enqueue(content));
+  }
+  isEmpty() { return this.head === null; }
+  front() { return this.isEmpty() ? null : this.head.content; }
+  enqueue(content) {
+    if (content === null || content === undefined) return;
+    const node = new QueueNode(content);
+    if (this.isEmpty()) this.head = node;
+    else this.tail.nextNode = node;
+    this.tail = node;
+  }
+  dequeue() {
+    if (this.isEmpty()) return;
+    this.head = this.head.nextNode;
+    if (this.head === null) this.tail = null;
+  }
+  toArray() {
+    const values = [];
+    for (let node = this.head; node !== null; node = node.nextNode) values.push(node.content);
+    return values;
+  }
+}
+
+function queueArrow(label, down = false) {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', down ? '0 0 16 26' : '0 0 44 20');
+  svg.setAttribute('class', down ? 'reference-arrow' : 'successor-arrow');
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', label);
+  const line = document.createElementNS(ns, 'path');
+  line.setAttribute('d', down ? 'M8 1V20' : 'M0 10H35');
+  line.setAttribute('fill', 'none');
+  line.setAttribute('stroke', 'currentColor');
+  line.setAttribute('stroke-width', '2');
+  const tip = document.createElementNS(ns, 'path');
+  tip.setAttribute('d', down ? 'M2 17L8 25L14 17Z' : 'M33 4L43 10L33 16Z');
+  tip.setAttribute('fill', 'currentColor');
+  svg.appendChild(line);
+  svg.appendChild(tip);
+  return svg;
+}
+
+function renderLinkedQueue(container, queue) {
+  const previousScroll = container.scrollLeft || 0;
+  container.replaceChildren();
+  container.dataset.head = queue.head ? queue.head.id : 'null';
+  container.dataset.tail = queue.tail ? queue.tail.id : 'null';
+  container.setAttribute('role', 'group');
+  container.setAttribute('aria-label', queue.isEmpty()
+    ? 'Leere Queue. head und tail zeigen auf null.'
+    : 'Verkettete Queue von vorn nach hinten: ' + queue.toArray().join(', '));
+  if (queue.isEmpty()) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-chain';
+    const diagram = document.createElement('div');
+    diagram.className = 'empty-diagram';
+    const nullId = container.id + '-empty-null';
+    ['head', 'tail'].forEach(reference => {
+      const row = document.createElement('div');
+      row.className = 'empty-reference ' + reference;
+      row.setAttribute('aria-describedby', nullId);
+      const name = document.createElement('code');
+      name.textContent = reference;
+      row.appendChild(name);
+      diagram.appendChild(row);
+    });
+    const arrows = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    arrows.setAttribute('class', 'empty-arrows');
+    arrows.setAttribute('viewBox', '0 0 110 80');
+    arrows.setAttribute('role', 'img');
+    arrows.setAttribute('aria-label', 'head und tail haben beide den Wert null');
+    arrows.innerHTML = '<path class="empty-head-path" d="M0 18H36C62 18 62 34 98 34" fill="none" stroke="currentColor" stroke-width="2" />'
+      + '<path class="empty-head-path" d="M98 28L110 34L98 40Z" fill="currentColor" />'
+      + '<path class="empty-tail-path" d="M0 62H36C62 62 62 46 98 46" fill="none" stroke="currentColor" stroke-width="2" />'
+      + '<path class="empty-tail-path" d="M98 40L110 46L98 52Z" fill="currentColor" />';
+    const nil = document.createElement('code');
+    nil.className = 'null-value';
+    nil.id = nullId;
+    nil.textContent = 'null';
+    diagram.append(arrows, nil);
+    empty.appendChild(diagram);
+    const explanation = document.createElement('p');
+    explanation.className = 'empty-label';
+    explanation.textContent = 'Die Queue ist leer. Es gibt keine Knoten.';
+    empty.appendChild(explanation);
+    container.appendChild(empty);
+    return;
+  }
+  const chain = document.createElement('div');
+  chain.className = 'linked-chain';
+  for (let node = queue.head; node !== null; node = node.nextNode) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'node-wrapper';
+    [['head', queue.head], ['tail', queue.tail]].forEach(([reference, target]) => {
+      if (target !== node) return;
+      const marker = document.createElement('div');
+      marker.className = 'node-reference ' + reference;
+      marker.dataset.target = node.id;
+      const text = document.createElement('code');
+      text.textContent = reference;
+      marker.append(text, queueArrow(reference + ' zeigt auf diesen Knoten', true));
+      wrapper.appendChild(marker);
+    });
+    const card = document.createElement('div');
+    card.className = 'linked-node';
+    card.dataset.nodeId = node.id;
+    card.dataset.next = node.nextNode ? node.nextNode.id : 'null';
+    if (node === queue.head) card.classList.add('is-head');
+    if (node === queue.tail) card.classList.add('is-tail');
+    const content = document.createElement('div');
+    content.className = 'node-content';
+    const contentKey = document.createElement('span');
+    contentKey.className = 'node-key';
+    contentKey.textContent = 'Inhalt';
+    const value = document.createElement('span');
+    value.className = 'node-name';
+    value.textContent = node.content;
+    value.title = node.content;
+    content.append(contentKey, value);
+    const next = document.createElement('div');
+    next.className = 'node-next';
+    const nextKey = document.createElement('code');
+    nextKey.className = 'node-key';
+    nextKey.textContent = 'nextNode';
+    const dot = document.createElement('span');
+    dot.className = 'pointer-dot';
+    dot.setAttribute('aria-hidden', 'true');
+    next.append(nextKey, dot);
+    card.append(content, next);
+    wrapper.appendChild(card);
+    chain.appendChild(wrapper);
+    const link = document.createElement('div');
+    link.className = 'next-link';
+    link.dataset.from = node.id;
+    link.dataset.to = node.nextNode ? node.nextNode.id : 'null';
+    link.appendChild(queueArrow(node.nextNode
+      ? 'nextNode zeigt auf den Knoten mit ' + node.nextNode.content
+      : 'nextNode des letzten Knotens zeigt auf null'));
+    chain.appendChild(link);
+  }
+  const end = document.createElement('div');
+  end.className = 'null-wrapper';
+  const nil = document.createElement('code');
+  nil.className = 'null-value';
+  nil.textContent = 'null';
+  end.appendChild(nil);
+  chain.appendChild(end);
+  container.appendChild(chain);
+  container.scrollLeft = previousScroll;
+}
+
     const firstNames=["Anna","Ben","Clara","David","Emma","Felix"];
     const lastNames=["Müller","Schmidt","Schneider","Fischer","Weber","Wagner"];
 
     const state = {
-      A: [], H: [],
+      A: new LinkedQueue(), H: new LinkedQueue(),
       code: [], codeHtml: [],
       lastFrontFrom: null,
       frontStillValid: false,
@@ -202,8 +414,8 @@
     // --------- UNDO / REDO LOGIK ---------
     function cloneCurrentSnapshot(){
       return {
-        A: [...state.A],
-        H: [...state.H],
+        A: state.A.toArray(),
+        H: state.H.toArray(),
         code: [...state.code],
         codeHtml: [...state.codeHtml],
         lastFrontFrom: state.lastFrontFrom,
@@ -216,8 +428,8 @@
     }
 
     function loadSnapshot(snap){
-      state.A = [...snap.A];
-      state.H = [...snap.H];
+      state.A = new LinkedQueue(snap.A);
+      state.H = new LinkedQueue(snap.H);
       state.code = [...snap.code];
       state.codeHtml = [...snap.codeHtml];
       state.lastFrontFrom = snap.lastFrontFrom;
@@ -288,17 +500,8 @@
       renderLane(qH, state.H);
       updateCodeBox();
     }
-    function renderLane(container, arr){
-      container.innerHTML='';
-      if(arr.length===0){ container.textContent='[leer]'; return; }
-      arr.forEach(n=>{
-        const d=document.createElement('div');
-        d.className='box';
-        d.textContent=n;
-        container.appendChild(d);
-      });
-      // immer nach unten scrollen, damit neueste unten sichtbar ist
-      container.scrollTop = container.scrollHeight;
+    function renderLane(container, queue){
+      renderLinkedQueue(container, queue);
     }
     function updateCodeBox(){
       const html = state.codeHtml.length ? state.codeHtml.join("\n")
@@ -320,9 +523,14 @@
         .replaceAll(">","&gt;");
     }
 
+    function javaStringLiteral(value){
+      return '"' + value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+        .replace(/\r/g, '\\r').replace(/\n/g, '\\n').replace(/\t/g, '\\t') + '"';
+    }
+
     function hardResetToInitial(){
-      state.A = Array.from({length:3}, randomName);
-      state.H = [];
+      state.A = new LinkedQueue(Array.from({length:3}, randomName));
+      state.H = new LinkedQueue();
       state.code = [];
       state.codeHtml = [];
       state.lastFrontFrom = null;
@@ -358,8 +566,8 @@
         const targetName = state.pendingEnqueueTarget;
         const targetArr = targetName==="ArztpraxisQueue" ? state.A : state.H;
 
-        targetArr.push(typed);
-        const line = `${targetName}.enqueue("${typed}");`;
+        targetArr.enqueue(typed);
+        const line = `${targetName}.enqueue(${javaStringLiteral(typed)});`;
         if(state.placeholderIndex!=null){
           setCodeAt(state.placeholderIndex, line);
         } else {
@@ -379,12 +587,12 @@
         if(state.lastFrontFrom && state.frontStillValid && state.lastFrontFrom !== targetName){
           const sourceName = state.lastFrontFrom;
           const sourceArr = sourceName==="ArztpraxisQueue" ? state.A : state.H;
-          const val = sourceArr[0];
+          const val = sourceArr.front();
           if(val==null){
             setHelp(`${sourceName} ist leer – front() kann nichts liefern. Drücke stattdessen „Name in Speicher“ (nach enqueue) oder fülle um.`);
             return;
           }
-          target.push(val);
+          target.enqueue(val);
           const line = `${targetName}.enqueue(${sourceName}.front());`;
           addOrReplacePlaceholder(targetName, line);
           clearPending();
@@ -393,13 +601,13 @@
 
         // 2) Kein Name & kein gültiges front(): setze Placeholder + merke Ziel
         state.pendingEnqueueTarget = targetName;
+        const placeholderText = `${targetName}.enqueue(/* <span class="placeholder-comment">Was soll hinzugefügt werden?</span> */);`;
+        const placeholderCode = `${targetName}.enqueue(/* Was soll hinzugefügt werden? */);`;
         if(state.placeholderIndex==null){
-          const placeholderText = `${targetName}.enqueue(/* <span class="placeholder-comment">Was soll hinzugefügt werden?</span> */);`;
-          addCode(
-            `${targetName}.enqueue(/* Was soll hinzugefügt werden? */);`,
-            placeholderText
-          );
+          addCode(placeholderCode, placeholderText);
           state.placeholderIndex = state.code.length-1;
+        } else {
+          setCodeAt(state.placeholderIndex, placeholderCode, placeholderText);
         }
         updateCodeBox();
         setHelp(`Du hast ${targetName}.enqueue() gewählt. Jetzt Quelle festlegen: 
@@ -427,11 +635,11 @@
     function dequeue(target){
       changeWrapper(()=>{
         const name = qName(target);
-        if(target.length===0){
+        if(target.isEmpty()){
           setHelp(`${name} ist leer. Prüfe vorher mit ${name}.isEmpty() oder füge nach enqueue einen Namen via „Name in Speicher“ hinzu.`);
           return;
         }
-        target.shift();
+        target.dequeue();
         addCode(`${name}.dequeue();`);
         if(state.lastFrontFrom === name){ state.frontStillValid = false; }
       });
@@ -440,17 +648,17 @@
     function front(target){
       changeWrapper(()=>{
         const sourceName = qName(target);
-        if(target.length===0){
+        if(target.isEmpty()){
           setHelp(`${sourceName} ist leer. Kein Wert für front(). Drücke stattdessen „Name in Speicher“ nach enqueue oder fülle erst um.`);
           return;
         }
-        const val = target[0];
+        const val = target.front();
 
         // pending-Enqueue auf anderes Ziel → direkte Kombi + Einfügen
         if(state.pendingEnqueueTarget && state.pendingEnqueueTarget !== sourceName){
           const targetName = state.pendingEnqueueTarget;
           const targetArr = targetName==="ArztpraxisQueue" ? state.A : state.H;
-          targetArr.push(val);
+          targetArr.enqueue(val);
           const line = `${targetName}.enqueue(${sourceName}.front());`;
           if(state.placeholderIndex!=null){
             setCodeAt(state.placeholderIndex, line);
@@ -472,10 +680,12 @@
     function isEmpty(target){
       changeWrapper(()=>{
         const name = qName(target);
-        const res = target.length===0;
+        const res = target.isEmpty();
         addCode(`${name}.isEmpty();`);
         if(res && name==="ArztpraxisQueue"){
-          setHelp("Die ArztpraxisQueue ist leer. Jetzt kannst du oben den Notfallnamen eingeben, dann ArztpraxisQueue.enqueue drücken und anschließend „Name in Speicher“.");
+          setHelp("ArztpraxisQueue.isEmpty(): true. Jetzt kannst du den Notfallnamen eingeben, ArztpraxisQueue.enqueue drücken und anschließend „Name in Speicher“.");
+        } else {
+          setHelp(`${name}.isEmpty(): ${res}`);
         }
       });
     }
